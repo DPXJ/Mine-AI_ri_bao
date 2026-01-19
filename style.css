@@ -436,6 +436,40 @@ textarea::placeholder {
   transform: translateY(0);
 }
 
+.refresh-btn {
+  background: linear-gradient(135deg, #667eea 0%, #00f2fe 100%);
+  border: none;
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.refresh-btn:active {
+  transform: translateY(0);
+}
+
+.refresh-btn.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.refresh-btn.loading svg {
+  animation: spin 1s linear infinite;
+}
+
+
 .output-content {
   background: var(--bg-input);
   border: 1px solid var(--border-color);

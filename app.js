@@ -40,6 +40,8 @@ const elements = {
   copyTomorrowBtn: document.getElementById('copyTomorrowBtn'),
   clearTodayBtn: document.getElementById('clearTodayBtn'),
   clearTomorrowBtn: document.getElementById('clearTomorrowBtn'),
+  refreshTodayBtn: document.getElementById('refreshTodayBtn'),
+  refreshTomorrowBtn: document.getElementById('refreshTomorrowBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
 
   // 模态框
@@ -453,6 +455,62 @@ function clearOutput(outputElement) {
   }
 }
 
+// ==================== 刷新功能 ====================
+async function handleRefresh(type) {
+  const config = getConfig();
+
+  // 检查 API Key
+  if (!config.apiKey) {
+    alert('请先在设置中配置 GLM API Key');
+    openModal();
+    return;
+  }
+
+  const outputElement = type === 'today' ? elements.todayOutput : elements.tomorrowOutput;
+  const btnElement = type === 'today' ? elements.refreshTodayBtn : elements.refreshTomorrowBtn;
+
+  // 检查是否有内容
+  if (outputElement.children.length === 0) {
+    alert('没有可刷新的内容');
+    return;
+  }
+
+  // 获取当前所有内容
+  const items = Array.from(outputElement.children);
+  const currentTexts = items.map(li => li.textContent);
+
+  // 显示加载状态
+  btnElement.classList.add('loading');
+  btnElement.disabled = true;
+
+  try {
+    // 并行处理所有行,重新润色
+    const promises = currentTexts.map(text => callGLMAPI(text, config));
+    const results = await Promise.all(promises);
+
+    // 清空并重新填充
+    outputElement.innerHTML = '';
+    results.forEach(result => {
+      const li = document.createElement('li');
+      li.textContent = result;
+      li.style.animation = 'fadeIn 0.5s ease';
+      outputElement.appendChild(li);
+    });
+
+    // 自动同步到飞书
+    await autoSyncToFeishu();
+
+  } catch (error) {
+    alert(`刷新失败: ${error.message}\n\n请检查:\n1. API Key 是否正确\n2. 网络连接是否正常\n3. API 额度是否充足`);
+    console.error('刷新错误:', error);
+  } finally {
+    // 恢复按钮状态
+    btnElement.classList.remove('loading');
+    btnElement.disabled = false;
+  }
+}
+
+
 // ==================== 模态框管理 ====================
 function openModal() {
   const config = getConfig();
@@ -536,6 +594,15 @@ elements.clearTodayBtn.addEventListener('click', () => {
 
 elements.clearTomorrowBtn.addEventListener('click', () => {
   clearOutput(elements.tomorrowOutput);
+});
+
+// 刷新按钮
+elements.refreshTodayBtn.addEventListener('click', () => {
+  handleRefresh('today');
+});
+
+elements.refreshTomorrowBtn.addEventListener('click', () => {
+  handleRefresh('tomorrow');
 });
 
 // 设置按钮
