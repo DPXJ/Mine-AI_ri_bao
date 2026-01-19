@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工作日报润色助手</title>
+  <meta name="description" content="智能工作日报润色和格式整理工具,使用AI将简短笔记转换为专业的Markdown格式日报">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="container">
+    <!-- 头部 -->
+    <header class="header">
+      <h1>
+        <svg class="title-icon" width="36" height="36" viewBox="0 0 24 24" fill="none">
+          <defs>
+            <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+              <stop offset="50%" style="stop-color:#00f2fe;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#f093fb;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="url(#iconGradient)"
+            stroke="url(#iconGradient)" stroke-width="2" />
+          <polyline points="14 2 14 8 20 8" stroke="url(#iconGradient)" stroke-width="2" />
+          <line x1="16" y1="13" x2="8" y2="13" stroke="white" stroke-width="2" />
+          <line x1="16" y1="17" x2="8" y2="17" stroke="white" stroke-width="2" />
+          <circle cx="10" cy="9" r="1" fill="white" />
+        </svg>
+        工作日报润色助手
+      </h1>
+      <button class="settings-btn" id="settingsBtn">设置</button>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="main-content">
+      <!-- 今日完成区域 -->
+      <div class="work-row">
+        <div class="card input-card">
+          <h2 class="section-title">今日完成</h2>
+          <textarea id="todayInput"
+            placeholder="输入今天完成的工作,每行一项&#10;例如:&#10;- 修复登录bug&#10;- 优化首页性能&#10;- 开会讨论需求"></textarea>
+        </div>
+
+        <button class="transform-btn-icon" id="transformTodayBtn" title="转换今日完成 (Ctrl+Enter)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <div class="card output-card">
+          <div class="output-header">
+            <h2 class="section-title">今日完成 (Markdown)</h2>
+            <div class="output-actions">
+              <button class="clear-btn" id="clearTodayBtn" title="清空内容">🗑️</button>
+              <button class="copy-btn" id="copyTodayBtn">�</button>
+            </div>
+          </div>
+          <ol class="output-content" id="todayOutput"></ol>
+        </div>
+      </div>
+
+      <!-- 明日计划区域 -->
+      <div class="work-row">
+        <div class="card input-card">
+          <h2 class="section-title">明日计划</h2>
+          <textarea id="tomorrowInput"
+            placeholder="输入明天的工作计划,每行一项&#10;例如:&#10;- 实现用户中心&#10;- 代码review&#10;- 写技术文档"></textarea>
+        </div>
+
+        <button class="transform-btn-icon" id="transformTomorrowBtn" title="转换明日计划 (Ctrl+Enter)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <div class="card output-card">
+          <div class="output-header">
+            <h2 class="section-title">明日计划 (Markdown)</h2>
+            <div class="output-actions">
+              <button class="clear-btn" id="clearTomorrowBtn" title="清空内容">🗑️</button>
+              <button class="copy-btn" id="copyTomorrowBtn">📋</button>
+            </div>
+          </div>
+          <ol class="output-content" id="tomorrowOutput"></ol>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 设置模态框 -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 1v6m0 6v6M6 12H1m6 0h6m6 0h5" />
+          </svg>
+          设置
+        </h2>
+        <button class="close-btn" id="closeModalBtn">×</button>
+      </div>
+
+      <!-- 标签页导航 -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="api">API配置</button>
+        <button class="tab-btn" data-tab="prompt">AI提示词</button>
+        <button class="tab-btn" data-tab="feishu">飞书同步</button>
+      </div>
+
+      <form id="settingsForm">
+        <!-- API配置标签页 -->
+        <div class="tab-content active" id="tab-api">
+          <div class="form-group">
+            <label for="apiKey">GLM API Key *</label>
+            <input type="password" id="apiKey" placeholder="请输入您的智谱AI API Key" autocomplete="off">
+            <p class="form-help">
+              API Key 将安全地存储在您的浏览器本地,不会上传到任何服务器。
+              <a href="https://open.bigmodel.cn/" target="_blank" class="help-link">获取 API Key →</a>
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="apiModel">模型选择</label>
+            <select id="apiModel" class="form-select">
+              <option value="glm-4-flash">GLM-4-Flash (推荐,快速)</option>
+              <option value="glm-4-air">GLM-4-Air (轻量)</option>
+              <option value="glm-4-airx">GLM-4-AirX (增强)</option>
+              <option value="glm-4-long">GLM-4-Long (长文本)</option>
+              <option value="glm-4-plus">GLM-4-Plus (高级)</option>
+            </select>
+            <p class="form-help">推荐使用 GLM-4-Flash,响应速度快且效果好</p>
+          </div>
+        </div>
+
+        <!-- AI提示词标签页 -->
+        <div class="tab-content" id="tab-prompt">
+          <div class="form-group">
+            <label for="companyName">公司/产品名称</label>
+            <input type="text" id="companyName" placeholder="例如: 字节跳动、飞书" autocomplete="off">
+            <p class="form-help">填写后AI会在润色时使用正确的产品名称</p>
+          </div>
+
+          <div class="form-group">
+            <label for="jobTitle">岗位/职责</label>
+            <input type="text" id="jobTitle" placeholder="例如: 前端开发工程师、产品经理" autocomplete="off">
+            <p class="form-help">帮助AI更准确地理解您的工作内容</p>
+          </div>
+
+          <div class="form-group">
+            <label for="customPrompt">自定义提示词</label>
+            <textarea id="customPrompt" rows="4"
+              placeholder="例如: 我是一名前端工程师,主要负责React项目开发。请用专业但不失亲和力的语气润色我的工作日报。"></textarea>
+            <p class="form-help">自定义AI润色的风格和重点,留空则使用默认提示词</p>
+          </div>
+        </div>
+
+        <!-- 飞书同步标签页 -->
+        <div class="tab-content" id="tab-feishu">
+          <div class="form-group">
+            <label class="switch-label-horizontal">
+              <span class="switch-text-left">启用飞书同步</span>
+              <div class="switch-wrapper">
+                <input type="checkbox" id="feishuEnabled" class="switch-input">
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+            <p class="form-help">
+              开启后将自动同步数据到飞书多维表格
+              <button type="button" class="help-btn" id="feishuHelpBtn">配置说明</button>
+            </p>
+          </div>
+
+          <div id="feishuConfig" class="config-section" style="display: none;">
+            <div class="form-group">
+              <label for="feishuAppId">App ID</label>
+              <input type="text" id="feishuAppId" placeholder="cli_xxxxxxxxxxxxxxxx" autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="feishuAppSecret">App Secret</label>
+              <input type="password" id="feishuAppSecret" placeholder="请输入飞书应用密钥" autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="feishuAppToken">表格 App Token</label>
+              <input type="text" id="feishuAppToken" placeholder="bascnxxxxxxxxxxxxxxxx" autocomplete="off">
+              <p class="form-help">在多维表格URL中可找到</p>
+            </div>
+
+            <div class="form-group">
+              <label for="feishuTableId">Table ID</label>
+              <input type="text" id="feishuTableId" placeholder="tblxxxxxxxxxxxxxxxx" autocomplete="off">
+              <p class="form-help">在数据表URL中可找到</p>
+            </div>
+          </div>
+
+          <!-- 飞书配置说明弹窗 -->
+          <div id="feishuHelpModal" class="help-modal" style="display: none;">
+            <div class="help-modal-content">
+              <h3>飞书配置说明</h3>
+              <ol>
+                <li>访问 <a href="https://open.feishu.cn/" target="_blank">飞书开放平台</a></li>
+                <li>创建企业自建应用,获取 App ID 和 App Secret</li>
+                <li>开通"多维表格"权限</li>
+                <li>在多维表格URL中找到 App Token 和 Table ID</li>
+                <li>确保表格包含字段: 日期、今日完成、明日计划</li>
+              </ol>
+              <button type="button" class="btn btn-primary" id="closeHelpBtn">知道了</button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="cancelBtn">取消</button>
+        <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
