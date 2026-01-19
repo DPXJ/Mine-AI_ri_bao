@@ -196,6 +196,41 @@ body::after {
   font-size: 1.2rem;
 }
 
+/* 日期选择器样式 */
+.date-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.date-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.date-input:hover {
+  border-color: var(--border-glow);
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
+/* 修复日期选择器在某些浏览器的颜色问题 */
+.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 /* ==================== 主要内容区域 ==================== */
 .main-content {
   flex: 1;

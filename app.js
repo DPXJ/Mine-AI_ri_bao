@@ -43,6 +43,7 @@ const elements = {
   refreshTodayBtn: document.getElementById('refreshTodayBtn'),
   refreshTomorrowBtn: document.getElementById('refreshTomorrowBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
+  dateSelector: document.getElementById('dateSelector'),
 
   // 模态框
   settingsModal: document.getElementById('settingsModal'),
@@ -129,8 +130,14 @@ async function callGLMAPI(text, config) {
 // ==================== 飞书 API 调用 ====================
 // 获取飞书 tenant_access_token
 async function getFeishuTenantToken(appId, appSecret) {
+  // 核心代理地址，支持跨域转发
+  const proxyPrefix = 'https://corsproxy.io/?';
+  const targetUrl = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
+  const isLocalFile = window.location.protocol === 'file:';
+
   try {
-    const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    console.log('【飞书调试】通过代理获取Token... 当前协议:', window.location.protocol);
+    const response = await fetch(proxyPrefix + encodeURIComponent(targetUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -147,7 +154,16 @@ async function getFeishuTenantToken(appId, appSecret) {
     }
     return data.tenant_access_token;
   } catch (error) {
-    console.error('获取飞书token失败:', error);
+    console.error('【严重】飞书Token获取失败:', error);
+
+    let errorMsg = '飞书同步受阻：由于浏览器安全限制(CORS)，本地文件无法直接同步。\n\n';
+    if (isLocalFile) {
+      errorMsg += '⚠️ 检测到您是直接双击打开的HTML，这会导致同步失败。\n\n建议解决方法：\n1. 在本文件夹内右键 -> "通过 VS Code 打开" -> 点击右下角 "Go Live"。\n2. 或者确保您的 "Allow CORS" 插件图标已由灰色变为彩色(已激活)。';
+    } else {
+      errorMsg += '代理服务器可能暂时不可用。请尝试开启翻译插件或跨域插件。';
+    }
+
+    alert(errorMsg);
     throw error;
   }
 }
@@ -164,50 +180,105 @@ function getTodayDateString() {
 // 查找今天的记录
 async function findTodayRecord(config) {
   if (!config.feishuAppId || !config.feishuAppToken || !config.feishuTableId) {
+    console.warn('【飞书调试】配置不完整，跳过查询');
     return null;
   }
 
   try {
+    console.group('【飞书同步】开始查找今日记录');
     const token = await getFeishuTenantToken(config.feishuAppId, config.feishuAppSecret);
     const todayDate = getTodayDateString();
+    console.log('今日目标日期:', todayDate);
 
-    // 列出记录并查找今天的
-    const response = await fetch(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records?page_size=100`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+    const proxyPrefix = 'https://corsproxy.io/?';
+    const targetUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records?page_size=100`;
+
+    const response = await fetch(proxyPrefix + encodeURIComponent(targetUrl), {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    );
+    });
 
     const data = await response.json();
     if (data.code !== 0) {
+      console.error('飞书 API 报错:', data.msg);
       throw new Error(data.msg || '查询飞书记录失败');
     }
 
-    // 查找日期字段匹配今天的记录
     const records = data.data?.items || [];
+    console.log(`共获取到 ${records.length} 条记录`);
+
     const todayRecord = records.find(record => {
-      const dateField = record.fields['日期'] || record.fields['Date'] || record.fields['date'];
-      return dateField && dateField.toString().includes(todayDate);
+      let dateField = record.fields['日期'] || record.fields['Date'] || record.fields['date'];
+      if (!dateField) return false;
+
+      // 如果是时间戳（数字类型），转换为 YYYY-MM-DD
+      if (typeof dateField === 'number') {
+        const d = new Date(dateField);
+        dateField = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+
+      const isMatch = dateField.toString().includes(todayDate);
+      if (isMatch) console.log('匹配到记录:', record.record_id);
+      return isMatch;
     });
 
+    if (!todayRecord) console.log('未找到今日已存在的记录，将创建新行');
+    console.groupEnd();
     return todayRecord || null;
   } catch (error) {
-    console.error('查找飞书记录失败:', error);
+    console.error('【飞书调试】查找失败:', error);
+    console.groupEnd();
     return null;
   }
 }
 
-// 创建或更新飞书记录
+// ==================== 本地存储功能 ====================
+// 【本地存储】保存到浏览器本地（替代飞书同步）
+function saveToLocal(todayContent, tomorrowContent) {
+  const saveData = {
+    date: getTodayDateString(),
+    todayContent: todayContent,
+    tomorrowContent: tomorrowContent,
+    timestamp: new Date().getTime()
+  };
+
+  try {
+    localStorage.setItem('daily_report_backup', JSON.stringify(saveData));
+    console.log('✅ 数据已自动保存到本地');
+  } catch (error) {
+    console.error('本地保存失败:', error);
+  }
+}
+
+// 从本地加载之前保存的内容
+function loadFromLocal() {
+  try {
+    const savedData = localStorage.getItem('daily_report_backup');
+    if (!savedData) return null;
+
+    const data = JSON.parse(savedData);
+    console.log('📂 发现本地保存的数据:', data.date);
+    return data;
+  } catch (error) {
+    console.error('读取本地数据失败:', error);
+    return null;
+  }
+}
+
+// 创建或更新飞书记录（已禁用，使用本地存储代替）
 async function syncToFeishu(config, todayContent, tomorrowContent) {
+  // 使用本地存储代替飞书同步
+  saveToLocal(todayContent, tomorrowContent);
+  return;
+
   if (!config.feishuAppId || !config.feishuAppToken || !config.feishuTableId) {
-    return; // 未配置飞书，跳过同步
+    return;
   }
 
   try {
+    console.group('【飞书同步】开始上传数据');
     const token = await getFeishuTenantToken(config.feishuAppId, config.feishuAppSecret);
     const todayDate = getTodayDateString();
     const existingRecord = await findTodayRecord(config);
@@ -218,44 +289,45 @@ async function syncToFeishu(config, todayContent, tomorrowContent) {
       '明日计划': tomorrowContent
     };
 
+    console.log('准备推送的内容:', fields);
+
+    const proxyPrefix = 'http://localhost:3000';
     let response;
     if (existingRecord) {
-      // 更新现有记录
-      response = await fetch(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records/${existingRecord.record_id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields })
-        }
-      );
+      console.log('执行【更新】操作, RecordID:', existingRecord.record_id);
+      const targetUrl = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records/${existingRecord.record_id}`;
+      response = await fetch(proxyPrefix + targetUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
     } else {
-      // 创建新记录
-      response = await fetch(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields })
-        }
-      );
+      console.log('执行【新增】操作');
+      const targetUrl = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records`;
+      response = await fetch(proxyPrefix + targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fields })
+      });
     }
 
     const data = await response.json();
     if (data.code !== 0) {
-      throw new Error(data.msg || '同步到飞书失败');
+      console.error('飞书 API 报错:', data.msg);
+      throw new Error(data.msg || '操作失败');
     }
 
-    console.log('飞书同步成功');
+    console.log('🚀 飞书同步成功！');
+    console.groupEnd();
   } catch (error) {
-    console.error('飞书同步失败:', error);
-    // 不抛出错误，避免影响主流程
+    console.error('❌ 飞书同步失败:', error);
+    console.groupEnd();
   }
 }
 
@@ -289,44 +361,45 @@ function getOutputText(outputElement) {
   return items.map(li => li.textContent).join('\n');
 }
 
-// 从飞书加载今天的数据
+// 从本地加载今天的数据（替代飞书加载）
 async function loadFromFeishu() {
-  const config = getConfig();
-  if (!config.feishuAppId || !config.feishuAppToken || !config.feishuTableId) {
-    return; // 未配置飞书，跳过
+  const currentDate = elements.dateSelector.value || getTodayDateString();
+  const savedData = loadFromLocal(currentDate);
+
+  if (!savedData) {
+    console.log(`💡 ${currentDate} 暂无保存数据`);
+    // 清空显示区域
+    elements.todayOutput.innerHTML = '';
+    elements.tomorrowOutput.innerHTML = '';
+    return;
   }
 
   try {
-    const record = await findTodayRecord(config);
-    if (record && record.fields) {
-      // 加载今日完成
-      const todayContent = record.fields['今日完成'] || '';
-      if (todayContent) {
-        const lines = todayContent.split('\n').filter(line => line.trim());
-        elements.todayOutput.innerHTML = '';
-        lines.forEach(line => {
-          const li = document.createElement('li');
-          li.textContent = line;
-          elements.todayOutput.appendChild(li);
-        });
-      }
-
-      // 加载明日计划
-      const tomorrowContent = record.fields['明日计划'] || '';
-      if (tomorrowContent) {
-        const lines = tomorrowContent.split('\n').filter(line => line.trim());
-        elements.tomorrowOutput.innerHTML = '';
-        lines.forEach(line => {
-          const li = document.createElement('li');
-          li.textContent = line;
-          elements.tomorrowOutput.appendChild(li);
-        });
-      }
-
-      console.log('从飞书加载数据成功');
+    // 加载今日完成
+    if (savedData.todayContent) {
+      const lines = savedData.todayContent.split('\n').filter(line => line.trim());
+      elements.todayOutput.innerHTML = '';
+      lines.forEach(line => {
+        const li = document.createElement('li');
+        li.textContent = line.replace(/^\d+\.\s*/, ''); // 移除数字序号
+        elements.todayOutput.appendChild(li);
+      });
     }
+
+    // 加载明日计划
+    if (savedData.tomorrowContent) {
+      const lines = savedData.tomorrowContent.split('\n').filter(line => line.trim());
+      elements.tomorrowOutput.innerHTML = '';
+      lines.forEach(line => {
+        const li = document.createElement('li');
+        li.textContent = line.replace(/^\d+\.\s*/, '');
+        elements.tomorrowOutput.appendChild(li);
+      });
+    }
+
+    console.log('✅ 已从本地恢复上次保存的内容');
   } catch (error) {
-    console.error('从飞书加载数据失败:', error);
+    console.error('恢复本地数据失败:', error);
   }
 }
 
@@ -640,11 +713,18 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ==================== 初始化 ====================
-// 检查是否已配置 API Key，并从飞书加载数据
+// 初始化日期选择器和加载数据
 window.addEventListener('load', async () => {
   const config = getConfig();
 
-  // 尝试从飞书加载今天的数据
+  // 设置日期选择器为今天
+  const today = getTodayDateString();
+  if (elements.dateSelector) {
+    elements.dateSelector.value = today;
+    elements.dateSelector.max = today; // 限制最大日期为今天
+  }
+
+  // 尝试加载今天的数据（从本地）
   await loadFromFeishu();
 
   if (!config.apiKey) {
@@ -654,6 +734,13 @@ window.addEventListener('load', async () => {
     }, 500);
   }
 });
+
+// 日期选择器变化时，加载对应日期的数据
+if (elements.dateSelector) {
+  elements.dateSelector.addEventListener('change', async () => {
+    await loadFromFeishu();
+  });
+}
 
 // 添加淡入动画样式
 const style = document.createElement('style');
