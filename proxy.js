@@ -3,11 +3,48 @@ const https = require('https');
 
 const PORT = 3000;
 
-const server = http.createServer((req, res) => {
-    // 允许跨域
+// 解析请求体
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                resolve(body ? JSON.parse(body) : {});
+            } catch (e) {
+                resolve(body);
+            }
+        });
+        req.on('error', reject);
+    });
+}
+
+// 发起 HTTPS 请求
+function httpsRequest(options, postData) {
+    return new Promise((resolve, reject) => {
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve({ statusCode: res.statusCode, headers: res.headers, data: JSON.parse(data) });
+                } catch (e) {
+                    resolve({ statusCode: res.statusCode, headers: res.headers, data });
+                }
+            });
+        });
+        req.on('error', reject);
+        if (postData) req.write(typeof postData === 'string' ? postData : JSON.stringify(postData));
+        req.end();
+    });
+}
+
+const server = http.createServer(async (req, res) => {
+    // CORS 头
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
     // 处理预检请求
     if (req.method === 'OPTIONS') {
@@ -16,39 +53,61 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 只代理飞书和代理地址相关的请求
-    let targetHost = 'open.feishu.cn';
-    let targetPath = req.url;
+    // 健康检查
+    if (req.url === '/health') {
+        res.writeHead(200);
+        res.end(JSON.stringify({ status: 'ok', message: '代理服务运行中' }));
+        return;
+    }
 
-    console.log(`[代理] 收到请求: ${req.method} ${targetPath}`);
+    console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
 
-    const options = {
-        hostname: targetHost,
-        path: targetPath,
-        method: req.method,
-        headers: {
-            ...req.headers,
-            host: targetHost, // 必须修改 host 头
+    try {
+        // 解析请求路径，转发到飞书 API
+        const targetPath = req.url;
+        const body = await parseBody(req);
+
+        // 构建转发请求
+        const options = {
+            hostname: 'open.feishu.cn',
+            port: 443,
+            path: targetPath,
+            method: req.method,
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        };
+
+        // 转发 Authorization 头
+        if (req.headers.authorization) {
+            options.headers['Authorization'] = req.headers.authorization;
         }
-    };
 
-    const proxyReq = https.request(options, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode, proxyRes.headers);
-        proxyRes.pipe(res);
-    });
+        console.log(`  → 转发到: https://open.feishu.cn${targetPath}`);
 
-    proxyReq.on('error', (e) => {
-        console.error(`[错误] 转发请求失败: ${e.message}`);
+        const result = await httpsRequest(options, Object.keys(body).length > 0 ? body : null);
+
+        console.log(`  ← 响应状态: ${result.statusCode}`);
+
+        res.writeHead(result.statusCode);
+        res.end(JSON.stringify(result.data));
+
+    } catch (error) {
+        console.error('  ✗ 代理错误:', error.message);
         res.writeHead(500);
-        res.end('Proxy Error');
-    });
-
-    req.pipe(proxyReq);
+        res.end(JSON.stringify({ error: error.message }));
+    }
 });
 
 server.listen(PORT, () => {
-    console.log(`==========================================`);
-    console.log(`飞书同步代理服务已在端口 ${PORT} 启动`);
-    console.log(`它将默默在后台为您解决跨域问题，请勿关闭本窗口`);
-    console.log(`==========================================`);
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║                    飞书代理服务已启动                        ║');
+    console.log('╠════════════════════════════════════════════════════════════╣');
+    console.log(`║  代理地址: http://localhost:${PORT}                          ║`);
+    console.log('║  健康检查: http://localhost:3000/health                    ║');
+    console.log('║                                                            ║');
+    console.log('║  请保持此窗口打开，然后在浏览器中使用日报助手                    ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('');
 });

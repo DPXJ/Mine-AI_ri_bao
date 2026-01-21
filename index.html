@@ -35,7 +35,7 @@
         工作日报润色助手
       </h1>
       <div class="date-selector-wrapper">
-        <label for="dateSelector" style="color: var(--text-secondary); margin-right: 8px;">📅 日期:</label>
+        <label for="dateSelector" class="date-label">📅 日期:</label>
         <input type="date" id="dateSelector" class="date-input" />
       </div>
       <button class="settings-btn" id="settingsBtn">设置</button>
@@ -160,7 +160,7 @@
             <input type="password" id="apiKey" placeholder="请输入您的智谱AI API Key" autocomplete="off">
             <p class="form-help">
               API Key 将安全地存储在您的浏览器本地,不会上传到任何服务器。
-              <a href="https://open.bigmodel.cn/" target="_blank" class="help-link">获取 API Key →</a>
+              <a href="https://open.bigmodel.cn/" target="_blank" rel="noopener" class="help-link">获取 API Key →</a>
             </p>
           </div>
 
@@ -215,7 +215,7 @@
             </p>
           </div>
 
-          <div id="feishuConfig" class="config-section" style="display: none;">
+          <div id="feishuConfig" class="config-section hidden">
             <div class="form-group">
               <label for="feishuAppId">App ID</label>
               <input type="text" id="feishuAppId" placeholder="cli_xxxxxxxxxxxxxxxx" autocomplete="off">
@@ -240,11 +240,11 @@
           </div>
 
           <!-- 飞书配置说明弹窗 -->
-          <div id="feishuHelpModal" class="help-modal" style="display: none;">
+          <div id="feishuHelpModal" class="help-modal hidden">
             <div class="help-modal-content">
               <h3>飞书配置说明</h3>
               <ol>
-                <li>访问 <a href="https://open.feishu.cn/" target="_blank">飞书开放平台</a></li>
+                <li>访问 <a href="https://open.feishu.cn/" target="_blank" rel="noopener">飞书开放平台</a></li>
                 <li>创建企业自建应用,获取 App ID 和 App Secret</li>
                 <li>开通"多维表格"权限</li>
                 <li>在多维表格URL中找到 App Token 和 Table ID</li>

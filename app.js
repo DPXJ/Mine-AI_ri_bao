@@ -130,16 +130,55 @@ async function callGLMAPI(text, config) {
 }
 
 // ==================== 飞书 API 调用 ====================
+// 获取代理服务地址（自动检测环境）
+function getProxyUrl() {
+  const hostname = window.location.hostname;
+
+  // 本地开发环境：使用本地代理
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+    return 'http://localhost:3000';
+  }
+
+  // Vercel 部署环境：使用相对路径的 API
+  if (hostname.includes('vercel.app') || hostname.includes('.vercel.')) {
+    return '/api/feishu-proxy';
+  }
+
+  // 其他云端环境：尝试使用相对路径
+  return '/api/feishu-proxy';
+}
+
+// 检查本地代理是否可用
+async function checkLocalProxy() {
+  try {
+    const response = await fetch('http://localhost:3000/health', {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000) // 2秒超时
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 // 获取飞书 tenant_access_token
 async function getFeishuTenantToken(appId, appSecret) {
-  // 核心代理地址，支持跨域转发
-  const proxyPrefix = 'https://corsproxy.io/?';
-  const targetUrl = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
-  const isLocalFile = window.location.protocol === 'file:';
+  const proxyUrl = getProxyUrl();
+  const targetPath = '/open-apis/auth/v3/tenant_access_token/internal';
+  const isLocal = proxyUrl.includes('localhost');
 
   try {
-    console.log('【飞书调试】通过代理获取Token... 当前协议:', window.location.protocol);
-    const response = await fetch(proxyPrefix + encodeURIComponent(targetUrl), {
+    console.log('【飞书调试】获取Token... 代理地址:', proxyUrl);
+
+    // 本地模式先检查代理是否运行
+    if (isLocal) {
+      const proxyOk = await checkLocalProxy();
+      if (!proxyOk) {
+        throw new Error('LOCAL_PROXY_NOT_RUNNING');
+      }
+    }
+
+    const response = await fetch(proxyUrl + targetPath, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -154,15 +193,26 @@ async function getFeishuTenantToken(appId, appSecret) {
     if (data.code !== 0) {
       throw new Error(data.msg || '获取飞书token失败');
     }
+    console.log('【飞书调试】Token获取成功');
     return data.tenant_access_token;
   } catch (error) {
     console.error('【严重】飞书Token获取失败:', error);
 
-    let errorMsg = '飞书同步受阻：由于浏览器安全限制(CORS)，本地文件无法直接同步。\n\n';
-    if (isLocalFile) {
-      errorMsg += '⚠️ 检测到您是直接双击打开的HTML，这会导致同步失败。\n\n建议解决方法：\n1. 在本文件夹内右键 -> "通过 VS Code 打开" -> 点击右下角 "Go Live"。\n2. 或者确保您的 "Allow CORS" 插件图标已由灰色变为彩色(已激活)。';
+    let errorMsg = '飞书同步失败：\n\n';
+
+    if (error.message === 'LOCAL_PROXY_NOT_RUNNING') {
+      errorMsg += '⚠️ 本地代理服务未运行！\n\n';
+      errorMsg += '请先运行代理服务：\n';
+      errorMsg += '1. 双击 "启动日报助手.bat"\n';
+      errorMsg += '2. 或在命令行运行: node proxy.js\n\n';
+      errorMsg += '然后刷新此页面重试。';
+    } else if (window.location.protocol === 'file:') {
+      errorMsg += '⚠️ 请勿直接双击HTML文件打开！\n\n';
+      errorMsg += '正确的使用方法：\n';
+      errorMsg += '1. 双击 "启动日报助手.bat" 启动服务\n';
+      errorMsg += '2. 在浏览器中访问显示的地址';
     } else {
-      errorMsg += '代理服务器可能暂时不可用。请尝试开启翻译插件或跨域插件。';
+      errorMsg += error.message || '未知错误';
     }
 
     alert(errorMsg);
@@ -192,10 +242,11 @@ async function findTodayRecord(config) {
     const todayDate = getTodayDateString();
     console.log('今日目标日期:', todayDate);
 
-    const proxyPrefix = 'https://corsproxy.io/?';
-    const targetUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records?page_size=100`;
+    // 使用统一的代理地址
+    const proxyUrl = getProxyUrl();
+    const targetPath = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records?page_size=100`;
 
-    const response = await fetch(proxyPrefix + encodeURIComponent(targetUrl), {
+    const response = await fetch(proxyUrl + targetPath, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -276,13 +327,19 @@ function loadFromLocal(targetDate) {
   }
 }
 
-// 创建或更新飞书记录（已禁用，使用本地存储代替）
+// 创建或更新飞书记录
 async function syncToFeishu(config, todayContent, tomorrowContent) {
-  // 使用本地存储代替飞书同步
+  // 始终保存到本地作为备份
   saveToLocal(todayContent, tomorrowContent);
-  return;
+
+  // 检查是否启用飞书同步
+  if (!config.feishuEnabled) {
+    console.log('【飞书同步】未启用飞书同步，仅保存到本地');
+    return;
+  }
 
   if (!config.feishuAppId || !config.feishuAppToken || !config.feishuTableId) {
+    console.warn('【飞书同步】配置不完整，跳过同步');
     return;
   }
 
@@ -292,20 +349,24 @@ async function syncToFeishu(config, todayContent, tomorrowContent) {
     const todayDate = getTodayDateString();
     const existingRecord = await findTodayRecord(config);
 
+    // 将日期字符串转换为时间戳（毫秒）- 飞书日期字段需要时间戳格式
+    const dateTimestamp = new Date(todayDate).getTime();
+
     const fields = {
-      '日期': todayDate,
+      '日期': dateTimestamp,
       '今日完成': todayContent,
       '明日计划': tomorrowContent
     };
 
     console.log('准备推送的内容:', fields);
 
-    const proxyPrefix = 'http://localhost:3000';
+    // 使用统一的代理地址
+    const proxyUrl = getProxyUrl();
     let response;
     if (existingRecord) {
       console.log('执行【更新】操作, RecordID:', existingRecord.record_id);
-      const targetUrl = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records/${existingRecord.record_id}`;
-      response = await fetch(proxyPrefix + targetUrl, {
+      const targetPath = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records/${existingRecord.record_id}`;
+      response = await fetch(proxyUrl + targetPath, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -315,8 +376,8 @@ async function syncToFeishu(config, todayContent, tomorrowContent) {
       });
     } else {
       console.log('执行【新增】操作');
-      const targetUrl = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records`;
-      response = await fetch(proxyPrefix + targetUrl, {
+      const targetPath = `/open-apis/bitable/v1/apps/${config.feishuAppToken}/tables/${config.feishuTableId}/records`;
+      response = await fetch(proxyUrl + targetPath, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -629,7 +690,12 @@ function openModal() {
   // 加载飞书配置
   if (elements.feishuEnabledInput) {
     elements.feishuEnabledInput.checked = config.feishuEnabled || false;
-    elements.feishuConfig.style.display = config.feishuEnabled ? 'block' : 'none';
+    // 使用 classList 操作 hidden 类（因为 CSS 中 .hidden 有 !important）
+    if (config.feishuEnabled) {
+      elements.feishuConfig.classList.remove('hidden');
+    } else {
+      elements.feishuConfig.classList.add('hidden');
+    }
   }
   elements.feishuAppIdInput.value = config.feishuAppId || '';
   elements.feishuAppSecretInput.value = config.feishuAppSecret || '';
@@ -816,10 +882,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // ==================== 飞书开关 ====================
 if (elements.feishuEnabledInput) {
   elements.feishuEnabledInput.addEventListener('change', (e) => {
+    // 使用 classList 操作 hidden 类（因为 CSS 中 .hidden 有 !important）
     if (e.target.checked) {
-      elements.feishuConfig.style.display = 'block';
+      elements.feishuConfig.classList.remove('hidden');
     } else {
-      elements.feishuConfig.style.display = 'none';
+      elements.feishuConfig.classList.add('hidden');
     }
   });
 }
