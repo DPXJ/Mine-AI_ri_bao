@@ -2,7 +2,7 @@
 // 用于绕过浏览器 CORS 限制
 // 这个文件处理所有 /api/feishu-proxy/* 的请求
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     // CORS 头部
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE');
@@ -71,4 +71,5 @@ export default async function handler(req, res) {
         console.error('[Vercel Proxy] Error:', error.message);
         res.status(500).json({ error: error.message, stack: error.stack });
     }
-}
+};
+
