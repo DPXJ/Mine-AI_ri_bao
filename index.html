@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>工作日报润色助手</title>
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23667eea'/><stop offset='100%25' stop-color='%2300f2fe'/></linearGradient></defs><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' fill='url(%23g)'/><polyline points='14 2 14 8 20 8' stroke='url(%23g)' stroke-width='2' fill='none'/><line x1='16' y1='13' x2='8' y2='13' stroke='white' stroke-width='2'/><line x1='16' y1='17' x2='8' y2='17' stroke='white' stroke-width='2'/></svg>">
   <meta name="description" content="智能工作日报润色和格式整理工具,使用AI将简短笔记转换为专业的Markdown格式日报">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -192,10 +194,13 @@
           </div>
 
           <div class="form-group">
-            <label for="customPrompt">自定义提示词</label>
+            <div class="label-with-action">
+              <label for="customPrompt">自定义提示词</label>
+              <button type="button" class="reset-btn" id="resetPromptBtn">恢复默认</button>
+            </div>
             <textarea id="customPrompt" rows="4"
-              placeholder="例如: 我是一名前端工程师,主要负责React项目开发。请用专业但不失亲和力的语气润色我的工作日报。"></textarea>
-            <p class="form-help">自定义AI润色的风格和重点,留空则使用默认提示词</p>
+              placeholder="请将以下简短的工作描述扩展为一句完整、专业的工作汇报。保持简洁,不要过度扩展,一句话即可。只返回扩展后的内容,不要添加任何其他说明。"></textarea>
+            <p class="form-help">自定义AI润色的风格和重点,点击"恢复默认"可还原为默认提示词</p>
           </div>
         </div>
 

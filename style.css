@@ -439,6 +439,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+  min-width: 60px;
+  justify-content: center;
 }
 
 .copy-btn:hover {
@@ -824,6 +826,36 @@ textarea::placeholder {
 
 .help-btn:hover {
   background: var(--bg-card-hover);
+  box-shadow: var(--shadow-neon);
+}
+
+/* 标签与按钮并排布局 */
+.label-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.label-with-action label {
+  margin-bottom: 0;
+}
+
+/* 恢复默认按钮 */
+.reset-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all var(--transition-base);
+}
+
+.reset-btn:hover {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
   box-shadow: var(--shadow-neon);
 }
 

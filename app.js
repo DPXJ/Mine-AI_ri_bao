@@ -1,6 +1,9 @@
 // ==================== 配置管理 ====================
 const CONFIG_KEY = 'daily_report_config';
 
+// 默认 AI 提示词
+const DEFAULT_AI_PROMPT = '请将以下简短的工作描述扩展为一句完整、专业的工作汇报。保持简洁,不要过度扩展,一句话即可。只返回扩展后的内容,不要添加任何其他说明。';
+
 // 获取配置
 function getConfig() {
   const config = localStorage.getItem(CONFIG_KEY);
@@ -69,7 +72,8 @@ const elements = {
   feishuTableIdInput: document.getElementById('feishuTableId'),
   feishuHelpBtn: document.getElementById('feishuHelpBtn'),
   feishuHelpModal: document.getElementById('feishuHelpModal'),
-  closeHelpBtn: document.getElementById('closeHelpBtn')
+  closeHelpBtn: document.getElementById('closeHelpBtn'),
+  resetPromptBtn: document.getElementById('resetPromptBtn')
 };
 
 // ==================== GLM API 调用 ====================
@@ -604,13 +608,13 @@ async function copyToClipboard(outputElement, button) {
   try {
     await navigator.clipboard.writeText(text);
 
-    // 显示复制成功状态
-    const originalText = button.textContent;
-    button.textContent = '✓ 已复制';
+    // 显示复制成功状态 - 保留原有的HTML内容
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '✓ 已复制';
     button.classList.add('copied');
 
     setTimeout(() => {
-      button.textContent = originalText;
+      button.innerHTML = originalHTML;
       button.classList.remove('copied');
     }, 2000);
   } catch (error) {
@@ -624,10 +628,11 @@ async function copyToClipboard(outputElement, button) {
 
     try {
       document.execCommand('copy');
-      button.textContent = '✓ 已复制';
+      const originalHTML = button.innerHTML;
+      button.innerHTML = '✓ 已复制';
       button.classList.add('copied');
       setTimeout(() => {
-        button.textContent = '📋 复制';
+        button.innerHTML = originalHTML;
         button.classList.remove('copied');
       }, 2000);
     } catch (err) {
@@ -952,13 +957,14 @@ if (elements.feishuEnabledInput) {
 if (elements.feishuHelpBtn) {
   elements.feishuHelpBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    elements.feishuHelpModal.style.display = 'flex';
+    e.stopPropagation();
+    elements.feishuHelpModal.classList.remove('hidden');
   });
 }
 
 if (elements.closeHelpBtn) {
   elements.closeHelpBtn.addEventListener('click', () => {
-    elements.feishuHelpModal.style.display = 'none';
+    elements.feishuHelpModal.classList.add('hidden');
   });
 }
 
@@ -966,7 +972,17 @@ if (elements.closeHelpBtn) {
 if (elements.feishuHelpModal) {
   elements.feishuHelpModal.addEventListener('click', (e) => {
     if (e.target === elements.feishuHelpModal) {
-      elements.feishuHelpModal.style.display = 'none';
+      elements.feishuHelpModal.classList.add('hidden');
     }
   });
 }
+
+// ==================== 恢复默认提示词 ====================
+if (elements.resetPromptBtn) {
+  elements.resetPromptBtn.addEventListener('click', () => {
+    if (elements.customPromptInput) {
+      elements.customPromptInput.value = DEFAULT_AI_PROMPT;
+    }
+  });
+}
+
