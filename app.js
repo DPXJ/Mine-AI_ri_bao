@@ -42,6 +42,8 @@ const elements = {
   clearTomorrowBtn: document.getElementById('clearTomorrowBtn'),
   refreshTodayBtn: document.getElementById('refreshTodayBtn'),
   refreshTomorrowBtn: document.getElementById('refreshTomorrowBtn'),
+  saveTodayBtn: document.getElementById('saveTodayBtn'),
+  saveTomorrowBtn: document.getElementById('saveTomorrowBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
   dateSelector: document.getElementById('dateSelector'),
 
@@ -252,14 +254,21 @@ function saveToLocal(todayContent, tomorrowContent) {
   }
 }
 
-// 从本地加载之前保存的内容
-function loadFromLocal() {
+// 从本地加载之前保存的内容（只加载指定日期的数据）
+function loadFromLocal(targetDate) {
   try {
     const savedData = localStorage.getItem('daily_report_backup');
     if (!savedData) return null;
 
     const data = JSON.parse(savedData);
-    console.log('📂 发现本地保存的数据:', data.date);
+    console.log('📂 发现本地保存的数据:', data.date, '目标日期:', targetDate);
+
+    // 只有当保存的日期与目标日期匹配时才返回数据
+    if (data.date !== targetDate) {
+      console.log('💡 保存的数据是其他日期的，不加载');
+      return null;
+    }
+
     return data;
   } catch (error) {
     console.error('读取本地数据失败:', error);
@@ -528,7 +537,29 @@ function clearOutput(outputElement) {
   }
 }
 
-// ==================== 刷新功能 ====================
+// ==================== 手动保存功能 ====================
+function saveOutput(type) {
+  const outputElement = type === 'today' ? elements.todayOutput : elements.tomorrowOutput;
+  const btnElement = type === 'today' ? elements.saveTodayBtn : elements.saveTomorrowBtn;
+
+  // 获取当前编辑后的内容
+  const todayText = getOutputText(elements.todayOutput);
+  const tomorrowText = getOutputText(elements.tomorrowOutput);
+
+  // 保存到本地
+  saveToLocal(todayText, tomorrowText);
+
+  // 显示保存成功状态
+  btnElement.classList.add('saved');
+  btnElement.title = '✓ 已保存';
+
+  setTimeout(() => {
+    btnElement.classList.remove('saved');
+    btnElement.title = '保存修改';
+  }, 2000);
+}
+
+// ==================== 刷新功能 ==
 async function handleRefresh(type) {
   const config = getConfig();
 
@@ -676,6 +707,15 @@ elements.refreshTodayBtn.addEventListener('click', () => {
 
 elements.refreshTomorrowBtn.addEventListener('click', () => {
   handleRefresh('tomorrow');
+});
+
+// 保存按钮
+elements.saveTodayBtn.addEventListener('click', () => {
+  saveOutput('today');
+});
+
+elements.saveTomorrowBtn.addEventListener('click', () => {
+  saveOutput('tomorrow');
 });
 
 // 设置按钮

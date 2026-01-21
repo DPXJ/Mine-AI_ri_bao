@@ -504,6 +504,52 @@ textarea::placeholder {
   animation: spin 1s linear infinite;
 }
 
+/* 保存按钮 */
+.save-btn {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  border: none;
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm), 0 0 15px rgba(56, 239, 125, 0.4);
+}
+
+.save-btn:active {
+  transform: translateY(0);
+}
+
+.save-btn.saved {
+  background: linear-gradient(135deg, #38ef7d 0%, #a8edea 100%);
+  box-shadow: 0 0 20px rgba(56, 239, 125, 0.6);
+}
+
+/* 可编辑输出区域 */
+.editable-output {
+  cursor: text;
+  transition: all var(--transition-base);
+}
+
+.editable-output:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.1), var(--shadow-neon);
+}
+
+.editable-output:hover {
+  border-color: var(--border-glow);
+}
 
 .output-content {
   background: var(--bg-input);
@@ -923,6 +969,8 @@ textarea::placeholder {
 .form-group textarea {
   resize: vertical;
   min-height: 100px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .form-select:focus,
