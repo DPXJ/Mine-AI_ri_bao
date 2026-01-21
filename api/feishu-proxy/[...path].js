@@ -1,6 +1,5 @@
 // Vercel Serverless Function: 飞书 API 代理
-// 用于绕过浏览器 CORS 限制
-// 这个文件处理所有 /api/feishu-proxy/* 的请求
+// Catch-all route handler for /api/feishu-proxy/*
 
 module.exports = async function handler(req, res) {
     // CORS 头部
@@ -16,30 +15,18 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        // 从请求 URL 中提取飞书 API 路径
-        // 例如: /api/feishu-proxy/open-apis/auth/v3/tenant_access_token/internal
-        // 需要提取: /open-apis/auth/v3/tenant_access_token/internal
-        const fullPath = req.url || '';
-        const proxyPrefix = '/api/feishu-proxy';
-
-        let targetPath = fullPath;
-        if (fullPath.startsWith(proxyPrefix)) {
-            targetPath = fullPath.substring(proxyPrefix.length);
-        }
-
-        // 移除查询参数（如果有）
-        const queryIndex = targetPath.indexOf('?');
-        if (queryIndex !== -1) {
-            targetPath = targetPath.substring(0, queryIndex);
-        }
+        // 从查询参数中获取路径（Vercel catch-all 路由会将路径放在 query.path 中）
+        const paths = req.query.path || [];
+        const targetPath = Array.isArray(paths) ? '/' + paths.join('/') : '/' + paths;
 
         if (!targetPath || targetPath === '/') {
-            res.status(400).json({ error: '缺少目标 API 路径' });
+            res.status(400).json({ error: '缺少目标 API 路径', debug: { query: req.query, url: req.url } });
             return;
         }
 
         const targetUrl = `https://open.feishu.cn${targetPath}`;
         console.log(`[Vercel Proxy] ${req.method} -> ${targetUrl}`);
+        console.log(`[Vercel Proxy] Query:`, req.query);
 
         // 构建转发请求的选项
         const fetchOptions = {
@@ -69,7 +56,11 @@ module.exports = async function handler(req, res) {
 
     } catch (error) {
         console.error('[Vercel Proxy] Error:', error.message);
-        res.status(500).json({ error: error.message, stack: error.stack });
+        res.status(500).json({
+            error: error.message,
+            stack: error.stack,
+            query: req.query,
+            url: req.url
+        });
     }
 };
-
