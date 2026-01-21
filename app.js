@@ -425,15 +425,66 @@ async function processText(text, config) {
 }
 
 // ==================== 辅助函数 ====================
-// 获取输出区域的文本内容
-function getOutputText(outputElement) {
+// 获取输出区域的文本内容（带序号的项目列表格式）
+function getOutputText(outputElement, withNumbers = true) {
   const items = Array.from(outputElement.children);
+  if (withNumbers) {
+    // 返回带序号的格式: "1. 内容"
+    return items.map((li, index) => `${index + 1}. ${li.textContent}`).join('\n');
+  }
   return items.map(li => li.textContent).join('\n');
 }
 
-// 从本地加载今天的数据（替代飞书加载）
+// 优先从飞书加载数据，失败时从本地加载
 async function loadFromFeishu() {
   const currentDate = elements.dateSelector.value || getTodayDateString();
+  const config = getConfig();
+
+  // 优先尝试从飞书加载（如果启用了飞书同步）
+  if (config.feishuEnabled && config.feishuAppId && config.feishuAppToken && config.feishuTableId) {
+    try {
+      console.log('🔄 尝试从飞书加载数据...');
+      const feishuRecord = await findTodayRecord(config);
+
+      if (feishuRecord && feishuRecord.fields) {
+        const fields = feishuRecord.fields;
+        let hasData = false;
+
+        // 加载今日完成
+        if (fields['今日完成']) {
+          const lines = fields['今日完成'].split('\n').filter(line => line.trim());
+          elements.todayOutput.innerHTML = '';
+          lines.forEach(line => {
+            const li = document.createElement('li');
+            li.textContent = line.replace(/^\d+\.\s*/, ''); // 移除数字序号
+            elements.todayOutput.appendChild(li);
+          });
+          hasData = true;
+        }
+
+        // 加载明日计划
+        if (fields['明日计划']) {
+          const lines = fields['明日计划'].split('\n').filter(line => line.trim());
+          elements.tomorrowOutput.innerHTML = '';
+          lines.forEach(line => {
+            const li = document.createElement('li');
+            li.textContent = line.replace(/^\d+\.\s*/, '');
+            elements.tomorrowOutput.appendChild(li);
+          });
+          hasData = true;
+        }
+
+        if (hasData) {
+          console.log('✅ 已从飞书加载数据');
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ 从飞书加载失败，尝试从本地加载:', error.message);
+    }
+  }
+
+  // 飞书加载失败或未启用，从本地加载
   const savedData = loadFromLocal(currentDate);
 
   if (!savedData) {
@@ -599,16 +650,22 @@ function clearOutput(outputElement) {
 }
 
 // ==================== 手动保存功能 ====================
-function saveOutput(type) {
+async function saveOutput(type) {
   const outputElement = type === 'today' ? elements.todayOutput : elements.tomorrowOutput;
   const btnElement = type === 'today' ? elements.saveTodayBtn : elements.saveTomorrowBtn;
 
-  // 获取当前编辑后的内容
-  const todayText = getOutputText(elements.todayOutput);
-  const tomorrowText = getOutputText(elements.tomorrowOutput);
+  // 获取当前编辑后的内容（带序号）
+  const todayText = getOutputText(elements.todayOutput, true);
+  const tomorrowText = getOutputText(elements.tomorrowOutput, true);
 
   // 保存到本地
   saveToLocal(todayText, tomorrowText);
+
+  // 同步到飞书
+  const config = getConfig();
+  if (config.feishuEnabled) {
+    await syncToFeishu(config, todayText, tomorrowText);
+  }
 
   // 显示保存成功状态
   btnElement.classList.add('saved');
