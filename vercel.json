@@ -1,8 +1,3 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/feishu-proxy/:path*",
-      "destination": "/api/feishu-proxy/:path*"
-    }
-  ]
+  "version": 2
 }
