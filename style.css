@@ -237,6 +237,50 @@ body::after {
   cursor: pointer;
 }
 
+/* 日期导航按钮 */
+.date-nav-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-base);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.date-nav-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-glow);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+}
+
+.date-nav-btn:active {
+  transform: translateY(0);
+}
+
+.date-today-btn {
+  background: var(--primary-gradient);
+  border-color: transparent;
+  color: white;
+  font-size: 0.8rem;
+}
+
+.date-today-btn:hover {
+  box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+  border-color: transparent;
+  color: white;
+}
+
 /* ==================== 主要内容区域 ==================== */
 .main-content {
   flex: 1;

@@ -49,6 +49,9 @@ const elements = {
   saveTomorrowBtn: document.getElementById('saveTomorrowBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
   dateSelector: document.getElementById('dateSelector'),
+  prevDayBtn: document.getElementById('prevDayBtn'),
+  nextDayBtn: document.getElementById('nextDayBtn'),
+  todayBtn: document.getElementById('todayBtn'),
 
   // 模态框
   settingsModal: document.getElementById('settingsModal'),
@@ -984,5 +987,58 @@ if (elements.resetPromptBtn) {
       elements.customPromptInput.value = DEFAULT_AI_PROMPT;
     }
   });
+}
+
+// ==================== 日期导航按钮 ====================
+// 切换到前一天
+if (elements.prevDayBtn) {
+  elements.prevDayBtn.addEventListener('click', async () => {
+    if (elements.dateSelector) {
+      const currentDate = new Date(elements.dateSelector.value);
+      currentDate.setDate(currentDate.getDate() - 1);
+      const newDateStr = formatDateToString(currentDate);
+      elements.dateSelector.value = newDateStr;
+      await loadFromFeishu();
+    }
+  });
+}
+
+// 切换到后一天
+if (elements.nextDayBtn) {
+  elements.nextDayBtn.addEventListener('click', async () => {
+    if (elements.dateSelector) {
+      const currentDate = new Date(elements.dateSelector.value);
+      const today = new Date();
+      currentDate.setDate(currentDate.getDate() + 1);
+
+      // 不允许超过今天
+      if (currentDate <= today) {
+        const newDateStr = formatDateToString(currentDate);
+        elements.dateSelector.value = newDateStr;
+        await loadFromFeishu();
+      }
+    }
+  });
+}
+
+// 切换到今天
+if (elements.todayBtn) {
+  elements.todayBtn.addEventListener('click', async () => {
+    if (elements.dateSelector) {
+      const todayStr = getTodayDateString();
+      if (elements.dateSelector.value !== todayStr) {
+        elements.dateSelector.value = todayStr;
+        await loadFromFeishu();
+      }
+    }
+  });
+}
+
+// 日期格式化辅助函数
+function formatDateToString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
