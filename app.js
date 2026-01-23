@@ -1,7 +1,7 @@
 // ==================== 配置管理 ====================
 const CONFIG_KEY = 'daily_report_config';
 
-// 默认 AI 提示词
+// 默认 AI 提示词（今日完成）
 const DEFAULT_AI_PROMPT = `Role: 工作日报润色专家
 
 Background
@@ -26,6 +26,32 @@ Core Rules (核心规则)
 示例
 输入：云农谷平台，AI图片分享功能，UI设计审核
 输出：完成云农谷平台「AI图片分享」功能的UI设计审核，同技术团队及UI设计同学进行沟通交流，确认调整后的设计稿。（已完成）`;
+
+// 明日计划专用提示词
+const DEFAULT_PLAN_PROMPT = `Role: 工作日报润色专家
+
+Background
+用户输入的是明日工作计划，通常是碎片化、口语化的短语。你需要将这些碎片信息转化为专业、客观、无主语的工作计划描述。
+
+Goals
+1. 准确识别工作项：用户输入通常是"项目/平台名 + 功能名 + 具体工作"的结构，正确理解并保持原意
+2. 专业化重写：将口语化短语转化为专业术语，但不要曲解原意
+3. 客观陈述：去除"我"、"我们"等主语，以动名词形式描述
+
+Core Rules (核心规则)
+1. 工作项是名词，不要拆解成多个动词短语，避免曲解原意
+2. 用直角引号「」标注功能名称或工作重点
+3. 句末统一添加（计划完成：100%）或用户指定的百分比
+4. 使用"计划"、"推进"、"开展"、"继续"等计划性动词开头
+5. 保持简洁，一句话即可，不要过度扩展
+6. 只返回润色后的内容，不要添加解释
+
+示例
+输入：实现用户中心
+输出：计划推进「用户中心」功能的开发与实现，完成核心模块的编码和调试工作。（计划完成：100%）
+
+输入：代码review
+输出：计划开展代码Review工作，对团队提交的代码进行质量审核和优化建议反馈。（计划完成：100%）`;
 
 // 获取配置
 function getConfig() {
@@ -103,11 +129,14 @@ const elements = {
 };
 
 // ==================== GLM API 调用 ====================
-async function callGLMAPI(text, config) {
+async function callGLMAPI(text, config, type = 'today') {
   const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
 
-  // 构建提示词：优先使用自定义提示词，否则使用默认提示词
-  let prompt = config.customPrompt || DEFAULT_AI_PROMPT;
+  // 根据类型选择默认提示词：今日完成 vs 明日计划
+  const defaultPrompt = type === 'tomorrow' ? DEFAULT_PLAN_PROMPT : DEFAULT_AI_PROMPT;
+
+  // 构建提示词：优先使用自定义提示词，否则使用对应类型的默认提示词
+  let prompt = config.customPrompt || defaultPrompt;
   prompt += '\n\n';
 
   // 添加岗位信息（用于调整专业术语和表达风格）
@@ -424,7 +453,7 @@ async function syncToFeishu(config, todayContent, tomorrowContent) {
 }
 
 // ==================== 文本处理 ====================
-async function processText(text, config) {
+async function processText(text, config, type = 'today') {
   // 按行分割,过滤空行
   const lines = text.split('\n')
     .map(line => line.trim())
@@ -434,8 +463,8 @@ async function processText(text, config) {
     return '';
   }
 
-  // 并行处理所有行
-  const promises = lines.map(line => callGLMAPI(line, config));
+  // 并行处理所有行，传递类型参数
+  const promises = lines.map(line => callGLMAPI(line, config, type));
 
   try {
     const results = await Promise.all(promises);
@@ -589,8 +618,8 @@ async function handleTransform(type) {
   btnElement.disabled = true;
 
   try {
-    // 处理文本
-    const result = await processText(inputText, config);
+    // 处理文本，传递类型参数（today/tomorrow）
+    const result = await processText(inputText, config, type);
 
     // 累加模式:将新内容添加到现有内容后面
     const lines = result.split('\n');
@@ -736,8 +765,8 @@ async function handleRefresh(type) {
   btnElement.disabled = true;
 
   try {
-    // 并行处理所有行,重新润色
-    const promises = currentTexts.map(text => callGLMAPI(text, config));
+    // 并行处理所有行,重新润色，传递类型参数
+    const promises = currentTexts.map(text => callGLMAPI(text, config, type));
     const results = await Promise.all(promises);
 
     // 清空并重新填充
