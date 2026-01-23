@@ -236,18 +236,19 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-// 查找今天的记录
-async function findTodayRecord(config) {
+// 查找指定日期的记录（支持传入目标日期，默认使用日期选择器的值）
+async function findTodayRecord(config, targetDate = null) {
   if (!config.feishuAppId || !config.feishuAppToken || !config.feishuTableId) {
     console.warn('【飞书调试】配置不完整，跳过查询');
     return null;
   }
 
   try {
-    console.group('【飞书同步】开始查找今日记录');
+    // 优先使用传入的目标日期，其次使用日期选择器的值，最后使用今天
+    const searchDate = targetDate || (elements.dateSelector ? elements.dateSelector.value : null) || getTodayDateString();
+    console.group('【飞书同步】开始查找记录');
     const token = await getFeishuTenantToken(config.feishuAppId, config.feishuAppSecret);
-    const todayDate = getTodayDateString();
-    console.log('今日目标日期:', todayDate);
+    console.log('目标日期:', searchDate);
 
     // 使用统一的代理地址
     const proxyUrl = getProxyUrl();
@@ -269,7 +270,7 @@ async function findTodayRecord(config) {
     const records = data.data?.items || [];
     console.log(`共获取到 ${records.length} 条记录`);
 
-    const todayRecord = records.find(record => {
+    const matchedRecord = records.find(record => {
       let dateField = record.fields['日期'] || record.fields['Date'] || record.fields['date'];
       if (!dateField) return false;
 
@@ -279,14 +280,14 @@ async function findTodayRecord(config) {
         dateField = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
 
-      const isMatch = dateField.toString().includes(todayDate);
+      const isMatch = dateField.toString().includes(searchDate);
       if (isMatch) console.log('匹配到记录:', record.record_id);
       return isMatch;
     });
 
-    if (!todayRecord) console.log('未找到今日已存在的记录，将创建新行');
+    if (!matchedRecord) console.log('未找到指定日期的记录');
     console.groupEnd();
-    return todayRecord || null;
+    return matchedRecord || null;
   } catch (error) {
     console.error('【飞书调试】查找失败:', error);
     console.groupEnd();
@@ -450,17 +451,20 @@ async function loadFromFeishu() {
   // 优先尝试从飞书加载（如果启用了飞书同步）
   if (config.feishuEnabled && config.feishuAppId && config.feishuAppToken && config.feishuTableId) {
     try {
-      console.log('🔄 尝试从飞书加载数据...');
-      const feishuRecord = await findTodayRecord(config);
+      console.log('🔄 尝试从飞书加载数据，目标日期:', currentDate);
+      const feishuRecord = await findTodayRecord(config, currentDate);
 
       if (feishuRecord && feishuRecord.fields) {
         const fields = feishuRecord.fields;
         let hasData = false;
 
+        // 清空现有内容
+        elements.todayOutput.innerHTML = '';
+        elements.tomorrowOutput.innerHTML = '';
+
         // 加载今日完成
         if (fields['今日完成']) {
           const lines = fields['今日完成'].split('\n').filter(line => line.trim());
-          elements.todayOutput.innerHTML = '';
           lines.forEach(line => {
             const li = document.createElement('li');
             li.textContent = line.replace(/^\d+\.\s*/, ''); // 移除数字序号
@@ -472,7 +476,6 @@ async function loadFromFeishu() {
         // 加载明日计划
         if (fields['明日计划']) {
           const lines = fields['明日计划'].split('\n').filter(line => line.trim());
-          elements.tomorrowOutput.innerHTML = '';
           lines.forEach(line => {
             const li = document.createElement('li');
             li.textContent = line.replace(/^\d+\.\s*/, '');
@@ -485,6 +488,11 @@ async function loadFromFeishu() {
           console.log('✅ 已从飞书加载数据');
           return;
         }
+      } else {
+        // 飞书中没有该日期的记录，清空显示区域
+        console.log(`💡 飞书中未找到 ${currentDate} 的记录`);
+        elements.todayOutput.innerHTML = '';
+        elements.tomorrowOutput.innerHTML = '';
       }
     } catch (error) {
       console.warn('⚠️ 从飞书加载失败，尝试从本地加载:', error.message);
